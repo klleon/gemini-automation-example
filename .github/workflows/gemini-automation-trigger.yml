@@ -1,0 +1,47 @@
+name: "Gemini Automation Trigger"
+
+# This workflow acts as a 'listener' that detects when a Pull Request is created or updated.
+on:
+  pull_request:
+    # Trigger this workflow for these specific PR events
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  # This job calls the actual review logic located in another file.
+  # This separation makes the code cleaner and reusable.
+  call_gemini_describe:
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'dev' && github.event.action == 'opened') ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/gemini-pr-describe'))
+    uses: ./.github/workflows/gemini-pr-describe.yml
+    secrets: inherit
+    with:
+      pr_number: "${{ github.event.pull_request.number || github.event.issue.number }}"
+
+  call_gemini_review:
+    needs: call_gemini_describe
+    if: |
+      always() &&
+      (
+        (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'dev' && (
+          github.event.action == 'synchronize' ||
+          github.event.action == 'reopened' ||
+          (github.event.action == 'opened' && needs.call_gemini_describe.result == 'success')
+        )) ||
+        (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/gemini-review'))
+      )
+    # 'uses' specifies the path to the worker workflow (gemini-code-review.yml)
+    uses: ./.github/workflows/gemini-code-review.yml
+    # 'secrets: inherit' passes all necessary API keys to the called workflow
+    secrets: inherit
+    with:
+      pr_number: "${{ github.event.pull_request.number || github.event.issue.number }}"
+      additional_context: "${{ github.event_name == 'issue_comment' && github.event.comment.body || '' }}"
+

@@ -1,0 +1,100 @@
+name: "🔎 Gemini Code Review"
+
+on:
+  workflow_call:
+    inputs:
+      pr_number:
+        type: string
+        required: true
+        description: "The Pull Request Number"
+      additional_context:
+        type: string
+        required: false
+        default: ""
+
+concurrency:
+  group: "${{ github.workflow }}-review-${{ inputs.pr_number }}"
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node (>=22)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: "Run Gemini Code Review"
+        uses: google-github-actions/run-gemini-cli@v0.1.18
+        id: gemini_code_review
+        env:
+          PULL_REQUEST_NUMBER: "${{ inputs.pr_number }}"
+          REPOSITORY: "${{ github.repository }}"
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        with:
+          gemini_api_key: "${{ secrets.GEMINI_API_KEY_DONGWOO }}"
+          gemini_model: "gemini-2.5-flash-lite"
+          gemini_debug: false
+          workflow_name: "gemini-review"
+          settings: |-
+            {
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server:v0.18.0"],
+                  "includeTools": [
+                    "pull_request_read",
+                    "create_pending_pull_request_review",
+                    "add_comment_to_pending_review",
+                    "submit_pending_pull_request_review"
+                  ],
+                  "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
+                }
+              }
+            }
+          prompt: |-
+            You are a specialized AI Software Engineer.
+            Review PR #${{ inputs.pr_number }} in "${{ github.repository }}".
+
+            **Context & Instructions:**
+            The `additional_context` may contain a user command (e.g., "/gemini-review focus on memory").
+            1. **Parse Context**: Ignore the command prefix. Focus on the specific instructions provided by the user (if any).
+            2. **Balanced Review**:
+               - **Priority**: deeply analyze the code related to the user's specific instructions.
+               - **General**: ALSO perform a general review for bugs, security risks, and major code smells in files NOT mentioned by the user. Do not get tunnel vision.
+
+            **Workflow & Deduplication:**
+            1. **Preparation (Crucial)**:
+               - Call `pull_request_read` with `method: "get_diff"` to read changes.
+               - Call `pull_request_read` with `method: "get_review_comments"` to read **existing feedback**.
+            2. **Deduplication**:
+               - Cross-reference the diff with existing comments.
+               - **Strictly AVOID** repeating points that have already been made by others.
+            3. **Create Pending Review**: Call `create_pending_pull_request_review`.
+            4. **Add Line Comments (Conditional)**:
+               - Use `add_comment_to_pending_review` ONLY for **new, meaningful** issues (bugs, security, logic errors) not yet pointed out.
+               - **Avoid** trivial nitpicks unless asked.
+            5. **Submit Review (Mandatory)**:
+               - You **MUST** call `submit_pending_pull_request_review` at the end.
+               - **Summary**: Summarize your findings. If no new issues were found because existing reviews covered everything, explicitly state: "Existing reviews are comprehensive; no new issues found."
+
+            Context: ${{ inputs.additional_context }}
+
+      - name: "Dump Gemini error report"
+        if: failure()
+        run: |
+          ls -al /tmp | sed -n '1,200p'
+          echo "----"
+          cat /tmp/gemini-client-error-*.json || true

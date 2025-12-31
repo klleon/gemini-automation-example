@@ -1,0 +1,11 @@
+{
+  "pull_request": {
+    "number": 1277,
+    "base": { "ref": "dev" },
+    "head": { "ref": "feature/test" }
+  },
+  "repository": {
+    "name": "klleon_cpp_worker",
+    "owner": { "login": "klleon" }
+  }
+}

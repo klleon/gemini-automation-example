@@ -1,0 +1,86 @@
+name: "📝 Gemini PR Describe"
+
+on:
+  workflow_call:
+    inputs:
+      pr_number:
+        type: string
+        required: true
+        description: "The Pull Request Number"
+
+concurrency:
+  group: "${{ github.workflow }}-describe-${{ inputs.pr_number }}"
+  cancel-in-progress: true
+
+jobs:
+  describe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node (>=22)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: "Run Gemini PR Description Generator"
+        uses: google-github-actions/run-gemini-cli@v0.1.18
+        id: gemini_pr_describe
+        env:
+          PULL_REQUEST_NUMBER: "${{ inputs.pr_number }}"
+          REPOSITORY: "${{ github.repository }}"
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        with:
+          gemini_api_key: "${{ secrets.GEMINI_API_KEY_DONGWOO }}"
+          gemini_model: "gemini-2.5-flash-lite"
+          gemini_debug: false
+          workflow_name: "gemini-describe"
+          settings: |-
+            {
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": [
+                    "run",
+                    "-i",
+                    "--rm",
+                    "-e",
+                    "GITHUB_PERSONAL_ACCESS_TOKEN",
+                    "ghcr.io/github/github-mcp-server:v0.18.0"
+                  ],
+                  "includeTools": [
+                    "pull_request_read",
+                    "update_pull_request"
+                  ],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+                  }
+                }
+              }
+            }
+          prompt: |-
+            You are an expert Technical Writer.
+            Generate a PR description for #${{ inputs.pr_number }} in "${{ github.repository }}".
+
+            1. Use `pull_request_read` to analyze changes and title.
+            2. Follow the format in `.github/pull_request_template.md`.
+            3. Fill sections: What, Why, How, and Test Check List.
+            4. Use `update_pull_request` to set the PR body.
+
+            Keep it professional and concise.
+
+      - name: "Dump Gemini error report"
+        if: failure()
+        run: |
+          ls -al /tmp | sed -n '1,200p'
+          echo "----"
+          cat /tmp/gemini-client-error-*.json || true
