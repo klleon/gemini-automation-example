@@ -1,0 +1,18 @@
+{
+  "action": "created",
+  "issue": {
+    "number": 1277,
+    "pull_request": {
+      "url": "https://api.github.com/repos/klleon/klleon_cpp_worker/pulls/1277"
+    }
+  },
+  "comment": {
+    "body": "/gemini-review"
+  },
+  "repository": {
+    "full_name": "klleon/klleon_cpp_worker",
+    "owner": {
+      "login": "klleon"
+    }
+  }
+}
