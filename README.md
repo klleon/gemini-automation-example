@@ -56,7 +56,7 @@ GitHub에 푸시하지 않고도 로컬 환경에서 `act` 도구를 사용하�
 *   **`secrets`**: 환경 변수 키값 파일.
     ```properties
     # .github/act/secrets 예시
-    GEMINI_API_KEY_DONGWOO=your_api_key_here
+    GEMINI_API_KEY=your_api_key_here
     GITHUB_TOKEN=your_personal_access_token_here
     ```
 
