@@ -87,7 +87,7 @@ act pull_request \
 | 이름 | 설명 | 비고 |
 |------|------|------|
 | `GITHUB_TOKEN` | GitHub API 호출을 위한 토큰 | 워크플로우 내 권한 상속 |
-| `GEMINI_API_KEY_DONGWOO` | Gemini AI 모델 API 키 | `gemini-code-review.yml` 등에서 참조됨 |
+| `GEMINI_API_KEY` | Gemini AI 모델 API 키 | `gemini-code-review.yml` 등에서 참조됨 |
 
 
 ```
